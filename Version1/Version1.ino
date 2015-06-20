@@ -2,6 +2,7 @@
 #include <YunServer.h>
 #include <YunClient.h>
 YunServer server;
+#define CYCLES 200
 
 //The desktop will actually reach out to the Ardunio
 //Arduino will set relays to connect resistors
@@ -16,12 +17,12 @@ void setup() {
  server.begin();
  
  //Pins that control the resistor network
- pinMode(4,OUTPUT);
  pinMode(5,OUTPUT);
- pinMode(6,OUTPUT);
+ turnOffCapacitor();
  
  //Input to the voltage reader
  pinMode(A0,INPUT);
+ pinMode(A2,INPUT);
 }
  
 void loop() {
@@ -31,19 +32,45 @@ void loop() {
     client.stop();
   }
   //Turn off all the resistors after every cycle, just to make sure they're off
-  turnOffResistor(1);
-  turnOffResistor(2);
-  turnOffResistor(3);
+  turnOffCapacitor();
   delay(200);
 }
 
 void process(YunClient client) {
+ int valHigh[CYCLES];
+ int valLow[CYCLES];
+ unsigned long time[CYCLES];
+ float fValHigh;
+ float fValLow;
+ String str = "";
+ //Turn on capacitor
+ turnOnCapacitor();
+ //Measure time to drain
+ for(int i; i < CYCLES; i++) {
+   time[i] = micros();
+   valHigh[i] = analogRead(A0);
+   valLow[i] = analogRead(A2);
+   delayMicroseconds(500);
+ }
+ turnOffCapacitor(); //The cap will drain on it's own
+ //Return data
+ for(int i; i < CYCLES-1; i++) {
+   fValHigh = valHigh[i]*(5.0 / 1023.0);
+   fValLow = valLow[i]*(5.0 / 1023.0);
+   client.println("Test");
+   client.println(str + time[i] + "\t" + time[i+1] + "\t" + fValHigh + "\t" + fValLow);
+ }
+}
+
+void oldPocess(YunClient client) {
   int pin, value;
   float fValue;
   pin = client.parseInt();
-  if(pin >= 4 and pin < 6) {
+  if(pin == 3 || pin == 5 || pin == 7) {
    //Turn on the mosfet connecting that resistor network
-   turnOnResistor(pin);
+   //turnOnResistor(pin);
+   //Remove this!!!
+   delay(10);
    //Read the value and reply
    value = analogRead(A0);
    fValue = value*(5.0 / 1023.0);
@@ -53,9 +80,11 @@ void process(YunClient client) {
   }
 }
 
-void turnOnResistor(int pin) {
-  digitalWrite(pin,HIGH);
+void turnOnCapacitor() {
+ digitalWrite(5,HIGH);
 }
-void turnOffResistor(int pin) {
-  digitalWrite(pin,LOW);
+
+void turnOffCapacitor() {
+  digitalWrite(5,LOW);
 }
+
