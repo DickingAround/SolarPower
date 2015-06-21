@@ -44,21 +44,22 @@ void process(YunClient client) {
  float fValLow;
  String str = "";
  //Turn on capacitor
- turnOnCapacitor();
+ //turnOnCapacitor();
  //Measure time to drain
  for(int i; i < CYCLES; i++) {
+   if(i == 10)
+     digitalWrite(5,HIGH);
    time[i] = micros();
    valHigh[i] = analogRead(A0);
    valLow[i] = analogRead(A2);
-   delayMicroseconds(500);
+   //delayMicroseconds(100);
  }
  turnOffCapacitor(); //The cap will drain on it's own
  //Return data
  for(int i; i < CYCLES-1; i++) {
    fValHigh = valHigh[i]*(5.0 / 1023.0);
    fValLow = valLow[i]*(5.0 / 1023.0);
-   client.println("Test");
-   client.println(str + time[i] + "\t" + time[i+1] + "\t" + fValHigh + "\t" + fValLow);
+   client.println(str + time[i] + "\t" + fValHigh + "\t" + fValLow);
  }
 }
 
