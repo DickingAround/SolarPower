@@ -3,6 +3,10 @@
 #include <YunClient.h>
 YunServer server;
 #define CYCLES 200
+#define READINGS 200
+//Grain in volts = 0.5; 0.5/10/5*1024 = 10
+#define GRAIN 10
+#define TIMECUTOFF 2000000
 
 //The desktop will actually reach out to the Ardunio
 //Arduino will set relays to connect resistors
@@ -18,6 +22,7 @@ void setup() {
  
  //Pins that control the resistor network
  pinMode(5,OUTPUT);
+ pinMode(7,OUTPUT);
  turnOffCapacitor();
  
  //Input to the voltage reader
@@ -37,22 +42,71 @@ void loop() {
 }
 
 void process(YunClient client) {
+ //Take readings every X volts until Y second pass
+ int valHigh[READINGS];
+ int valLow[READINGS];
+ unsigned long time[READINGS];
+ String str = "";
+ float fValHigh;
+ float fValLow;
+ int oldDelta = 0;
+ int newDelta = 0;
+ int i = 0;
+ unsigned long startTime = micros();
+ turnOnCapacitor();
+ while(i < READINGS) {
+   time[i] = micros();
+   valHigh[i] = analogRead(A0);
+   valLow[i] = analogRead(A2);
+   //client.println(str + time[i] + "," + oldDelta + "," + valHigh[i] + "," + valLow[i]);
+   if(time[i] - startTime > TIMECUTOFF)
+     break;
+   newDelta = (valHigh[i] - valLow[i]);
+   if(newDelta - oldDelta > GRAIN) {
+     i++;
+     oldDelta = newDelta;
+   }
+ }
+ turnOffCapacitor(); //The cap will drain on it's own
+ //Return data
+ if(i == 0) {
+  client.println("No significant voltage change detected.");
+ }
+ for(int k = 0; k <= i; k++) {
+   fValHigh = valHigh[k]*(5.0 / 1023.0);
+   fValLow = valLow[k]*(5.0 / 1023.0);
+   client.println(str + time[k] + "\t" + fValHigh + "\t" + fValLow);
+ }
+}
+
+void turnOnCapacitor() {
+ digitalWrite(7,HIGH);
+}
+
+void turnOffCapacitor() {
+  digitalWrite(7,LOW);
+  digitalWrite(5,LOW);
+}
+
+
+
+/*void process(YunClient client) {
  int valHigh[CYCLES];
  int valLow[CYCLES];
  unsigned long time[CYCLES];
  float fValHigh;
  float fValLow;
  String str = "";
+ int waitTime = client.parseInt();
  //Turn on capacitor
- //turnOnCapacitor();
+ turnOnCapacitor();
  //Measure time to drain
  for(int i; i < CYCLES; i++) {
-   if(i == 10)
-     digitalWrite(5,HIGH);
    time[i] = micros();
    valHigh[i] = analogRead(A0);
    valLow[i] = analogRead(A2);
-   //delayMicroseconds(100);
+   if(waitTime > 0)
+     delayMicroseconds(waitTime);
  }
  turnOffCapacitor(); //The cap will drain on it's own
  //Return data
@@ -61,31 +115,5 @@ void process(YunClient client) {
    fValLow = valLow[i]*(5.0 / 1023.0);
    client.println(str + time[i] + "\t" + fValHigh + "\t" + fValLow);
  }
-}
-
-void oldPocess(YunClient client) {
-  int pin, value;
-  float fValue;
-  pin = client.parseInt();
-  if(pin == 3 || pin == 5 || pin == 7) {
-   //Turn on the mosfet connecting that resistor network
-   //turnOnResistor(pin);
-   //Remove this!!!
-   delay(10);
-   //Read the value and reply
-   value = analogRead(A0);
-   fValue = value*(5.0 / 1023.0);
-   //client.print(F("Input reads "));
-   client.println(fValue);
-   //don't need to turn off the resistors because the loop does 
-  }
-}
-
-void turnOnCapacitor() {
- digitalWrite(5,HIGH);
-}
-
-void turnOffCapacitor() {
-  digitalWrite(5,LOW);
-}
+}*/
 
